@@ -9,17 +9,20 @@ Entry point that:
 
 import os
 import warnings
+from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
 import uvicorn
+
+# Load environment variables from current directory (.env file)
+env_path = Path(__file__).parent / ".env"
+load_dotenv(env_path)
 
 # Import singleton graph with MCP tools and checkpointer already initialized
 from src.agent import graph, header_tracker
 
 from copilotkit import LangGraphAGUIAgent
 from ag_ui_langgraph import add_langgraph_fastapi_endpoint
-
-_ = load_dotenv()
 
 print("[Main] ✅ Singleton graph and MCP tools initialized")
 

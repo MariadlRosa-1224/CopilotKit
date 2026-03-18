@@ -11,7 +11,9 @@ Tools and graph are initialized as singletons at module load time.
 """
 
 import asyncio
+from pathlib import Path
 from typing import List
+from dotenv import load_dotenv
 
 from copilotkit import CopilotKitState
 from langchain_core.messages import SystemMessage
@@ -26,6 +28,10 @@ from typing_extensions import Literal
 from src.util import should_route_to_tool_node
 from mcp_client import get_client
 from mcp_header_interceptor import get_interceptor
+
+# Load environment variables from parent directory (.env file)
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(env_path)
 
 print("[Agent] Initializing LangGraph agent with MCP support...")
 
