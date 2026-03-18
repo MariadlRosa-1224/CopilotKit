@@ -149,10 +149,17 @@ async def initialize_at_startup():
     """
     global _initialization_graph
 
-    print("[AgentFactory] === STARTUP INITIALIZATION ===")
+    print("\n" + "="*60)
+    print("[AgentFactory] 🚀 === STAGE 1: STARTUP INITIALIZATION ===")
+    print("="*60)
+
+    from mcp_header_interceptor import log_tool_execution
+    log_tool_execution("MCP-Clients-Loading", stage="initialization")
+
     tools = await _load_tools_at_startup()
     _initialization_graph = _build_graph(tools)
     print(f"[AgentFactory] ✅ Initialization graph built with {len(tools)} tools")
+    print("="*60 + "\n")
     return _initialization_graph
 
 
@@ -164,11 +171,15 @@ def build_request_graph():
     """
     global _current_request_graph, _cached_tools
 
+    print("[AgentFactory] 📍 === STAGE 2: PER-REQUEST GRAPH BUILD ===")
+
     if _cached_tools is None:
         print("[AgentFactory] ⚠️  No cached tools available, building with empty tools")
         _current_request_graph = _build_graph([])
     else:
+        print(f"[AgentFactory] ✅ Building fresh graph with {len(_cached_tools)} cached tools")
         _current_request_graph = _build_graph(_cached_tools)
+        print("[AgentFactory] ✅ Graph ready for request execution")
 
     return _current_request_graph
 
