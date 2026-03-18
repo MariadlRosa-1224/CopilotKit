@@ -78,7 +78,7 @@ class RequestAwareDynamicAgent:
     - Tools execute with contextvar-aware headers from interceptor
     """
 
-    async def __call__(self, input_data):
+    async def run(self, input_data):
         """
         Run agent for this request:
         1. Rebuild graph with same cached tools
@@ -99,6 +99,11 @@ class RequestAwareDynamicAgent:
 
         # Stream responses
         async for event in agent.run(input_data):
+            yield event
+
+    async def __call__(self, input_data):
+        """Alias for run() for compatibility."""
+        async for event in self.run(input_data):
             yield event
 
 
