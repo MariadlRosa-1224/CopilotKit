@@ -98,8 +98,17 @@ class RequestAwareDynamicAgent:
         )
 
         # Stream responses
+        event_count = 0
+        print(f"[RequestAwareDynamicAgent] 📡 Starting response stream...")
         async for event in agent.run(input_data):
+            event_count += 1
+            # Log event type for visibility
+            if isinstance(event, dict):
+                event_type = event.get('type', 'unknown')
+                print(f"[ResponseStream] 📤 Event #{event_count}: {event_type}")
             yield event
+        print(f"[RequestAwareDynamicAgent] ✅ Response stream complete ({event_count} events)")
+        print("="*60 + "\n")
 
     async def __call__(self, input_data):
         """Alias for run() for compatibility."""
