@@ -7,14 +7,13 @@ Architecture:
    - Build and cache initialization graph
 
 2. Per request (app invocation):
-   - Set request-specific headers in contextvar
+   - Set request-specific headers in contextvar via middleware
    - Rebuild graph with same cached tools
    - Tools use current request headers via interceptor context
 """
 
 import os
 import warnings
-import asyncio
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
@@ -25,7 +24,7 @@ import uvicorn
 env_path = Path(__file__).parent / ".env"
 load_dotenv(env_path)
 
-from src.agent_factory import initialize_at_startup, build_request_graph, get_current_graph, header_tracker
+from src.agent_factory import initialize_at_startup, build_request_graph
 from mcp_header_interceptor import set_request_headers
 
 from copilotkit import LangGraphAGUIAgent
@@ -56,6 +55,19 @@ app = FastAPI(
 )
 
 
+# Middleware to set request headers before endpoint processes
+@app.middleware("http")
+async def set_headers_middleware(request: Request, call_next):
+    """Middleware to extract and set request headers in context."""
+    # Extract headers for MCP context
+    request_headers = dict(request.headers)
+    set_request_headers(request_headers)
+    print(f"[Middleware] 📝 Request headers set in context")
+
+    response = await call_next(request)
+    return response
+
+
 class RequestAwareDynamicAgent:
     """
     Wraps LangGraphAGUIAgent to rebuild graph per request with current headers.
@@ -66,17 +78,14 @@ class RequestAwareDynamicAgent:
     - Tools execute with contextvar-aware headers from interceptor
     """
 
-    async def run(self, input_data, request_headers: dict):
+    async def __call__(self, input_data):
         """
         Run agent for this request:
-        1. Set request headers in contextvar
-        2. Rebuild graph with same cached tools
-        3. Stream responses using rebuilt graph
-        """
-        # Set request headers in contextvar (interceptor will use these)
-        set_request_headers(request_headers)
-        print(f"[RequestAwareDynamicAgent] 📝 Request headers set in context")
+        1. Rebuild graph with same cached tools
+        2. Stream responses using rebuilt graph
 
+        Note: Request headers are already set in context by middleware
+        """
         # Rebuild graph for this request (uses cached tools, new headers context)
         graph = build_request_graph()
         print(f"[RequestAwareDynamicAgent] 🔄 Request graph rebuilt")
@@ -96,21 +105,12 @@ class RequestAwareDynamicAgent:
 # Create request-aware agent
 request_agent = RequestAwareDynamicAgent()
 
-
-@app.post("/")
-async def agent_endpoint(input_data, request: Request):
-    """
-    Main agent endpoint:
-    1. Extract headers from HTTP request
-    2. Build graph with current request headers
-    3. Stream responses
-    """
-    # Extract headers for MCP context
-    request_headers = dict(request.headers)
-
-    # Run agent with request headers
-    async for chunk in request_agent.run(input_data, request_headers):
-        yield chunk
+# Use add_langgraph_fastapi_endpoint to properly handle the CopilotKit protocol
+add_langgraph_fastapi_endpoint(
+    app=app,
+    agent=request_agent,
+    path="/",
+)
 
 
 @app.get("/health")
