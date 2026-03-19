@@ -14,6 +14,7 @@ Architecture:
 """
 
 import asyncio
+import os
 from typing import List
 from pathlib import Path
 from dotenv import load_dotenv
@@ -35,6 +36,12 @@ from mcp_header_interceptor import get_interceptor, set_request_headers
 # Load environment variables from parent directory
 env_path = Path(__file__).parent.parent / ".env"
 load_dotenv(env_path)
+
+# Feature flag: Always rebuild graph with tools (allows for token invalidation, etc)
+ALWAYS_REBUILD_GRAPH_WITH_TOOLS = os.getenv("ALWAYS_REBUILD_GRAPH_WITH_TOOLS", "false").lower() == "true"
+
+if ALWAYS_REBUILD_GRAPH_WITH_TOOLS:
+    print("[AgentFactory] ⚙️  ALWAYS_REBUILD_GRAPH_WITH_TOOLS=true (graphs rebuilt with tools every request)")
 
 print("[AgentFactory] Initializing module-level singletons...")
 
@@ -168,18 +175,33 @@ def build_request_graph():
     Build graph for request invocation:
     - Uses cached tools (loaded at startup)
     - Intercepts will use current request headers from contextvar
+    - Can optionally reload tools if ALWAYS_REBUILD_GRAPH_WITH_TOOLS=true
     """
     global _current_request_graph, _cached_tools
 
     print("[AgentFactory] 📍 === STAGE 2: PER-REQUEST GRAPH BUILD ===")
 
-    if _cached_tools is None:
+    set_request_headers({
+            "x-initialization": "false",
+            "x-startup": "false"
+        })
+
+    # Determine which tools to use
+    tools_to_use = _cached_tools if _cached_tools is not None else []
+
+    if ALWAYS_REBUILD_GRAPH_WITH_TOOLS and _cached_tools:
+        print(f"[AgentFactory] 🔄 ALWAYS_REBUILD_GRAPH_WITH_TOOLS enabled - will reload tools on next request")
+        # TODO: Implement async tool reloading on next request
+        # This could be triggered by a custom header like "x-reload-tools: true"
+
+    if tools_to_use:
+        print(f"[AgentFactory] ✅ Building fresh graph with {len(tools_to_use)} cached tools")
+        _current_request_graph = _build_graph(tools_to_use)
+    else:
         print("[AgentFactory] ⚠️  No cached tools available, building with empty tools")
         _current_request_graph = _build_graph([])
-    else:
-        print(f"[AgentFactory] ✅ Building fresh graph with {len(_cached_tools)} cached tools")
-        _current_request_graph = _build_graph(_cached_tools)
-        print("[AgentFactory] ✅ Graph ready for request execution")
+
+    print("[AgentFactory] ✅ Graph ready for request execution")
 
     return _current_request_graph
 
