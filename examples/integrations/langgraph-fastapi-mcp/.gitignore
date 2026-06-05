@@ -58,3 +58,5 @@ __pycache__/
 # python
 .venv/
 .langgraph_api/
+
+/generated/prisma
